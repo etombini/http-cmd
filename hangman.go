@@ -4,28 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 )
 
 type Harvest struct {
-	Cmdline     string
-	Return_code int
-	Pid         int
-	Stdout      string
-	Stderr      string
+	Cmdline         string
+	Return_code     int
+	Timeout_reached bool
+	Pid             int
+	Stdout          string
+	Stderr          string
 }
-
-//func main() {
-//	h := Reaper("python /Users/elvis/etoinc/go/src/github.com/etombini/hangman/scripts/py-test.py", 1)
-//	fmt.Println("Running it !")
-//	fmt.Printf("PID: %d\n", h.pid)
-//	fmt.Println("STDOUT")
-//	fmt.Println(h.stdout)
-//	fmt.Println("STDERR")
-//	fmt.Println(h.stderr)
-//}
 
 func Reaper(cmdline string, timeout int) Harvest {
 	//cmdline = "sh -c " + cmdline
@@ -50,6 +40,7 @@ func Reaper(cmdline string, timeout int) Harvest {
 	var h Harvest
 	h.Pid = cmd.Process.Pid
 	h.Return_code = 0
+	h.Timeout_reached = false
 
 	done := make(chan error, 1)
 	go func() {
@@ -62,7 +53,7 @@ func Reaper(cmdline string, timeout int) Harvest {
 			fmt.Println("Some error happened when trying to kill the process")
 		}
 		h.Return_code = 127
-		stderr.WriteString("\nCommand $ " + cmdline + " killed because timeout (" + strconv.Itoa(timeout) + "s.) is reached")
+		h.Timeout_reached = true
 
 	case err := <-done:
 		if err != nil {

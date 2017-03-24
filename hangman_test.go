@@ -11,6 +11,9 @@ func TestLs(t *testing.T) {
 	if h.Return_code != 0 {
 		t.Error("Return code is not 0: ", h.Return_code)
 	}
+	if h.Timeout_reached == true {
+		t.Error("Timeout has been reached: ", h.Timeout_reached)
+	}
 	if h.Stderr != "" {
 		t.Error("There are errors on stderr")
 	}
@@ -25,7 +28,7 @@ func TestOverTime(t *testing.T) {
 	if h.Return_code == 0 {
 		t.Error("Return code is zero: ", h.Return_code)
 	}
-	if h.Stderr == "" {
-		t.Error("There is no error on stderr")
+	if h.Timeout_reached == false {
+		t.Error("Timeout has not been reached: ", h.Timeout_reached)
 	}
 }

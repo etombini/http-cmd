@@ -1,7 +1,7 @@
 package hangman_test
 
 import (
-	"github.com/etombini/hangman"
+	"github.com/etombini/http-cmd/pkg/hangman"
 	"testing"
 )
 

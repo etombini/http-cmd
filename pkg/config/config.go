@@ -2,10 +2,11 @@ package config
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 const (
@@ -45,6 +46,7 @@ type ExecConfig struct {
 	Timeout     int
 }
 
+//GetConfig returns the server configuration, including categories and executer
 func GetConfig(cfgfile string) *ServerConfig {
 	if cfgfile == "" {
 		fmt.Printf("Empty configuration file path, using default %s\n", DefaultConfPath)
@@ -137,6 +139,10 @@ func GetConfig(cfgfile string) *ServerConfig {
 	}
 
 	for category := range categories {
+		if strings.Contains(category, "/") {
+			fmt.Fprintf(os.Stderr, "A category name can not contain a \"/\" as in %s\n", category)
+			os.Exit(1)
+		}
 		var cc CategoryConfig
 		cc.Name = category
 		cc.ExecsPath = ""
@@ -183,6 +189,10 @@ func GetConfig(cfgfile string) *ServerConfig {
 		}
 
 		for exec := range execs {
+			if strings.Contains(exec, "/") {
+				fmt.Fprintf(os.Stderr, "A executer name can not contain a \"/\" as in %s\n", exec)
+				os.Exit(1)
+			}
 			var ec ExecConfig
 			ec.Name = exec
 			ec.Command = ""

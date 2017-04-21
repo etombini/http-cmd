@@ -1,0 +1,9 @@
+execs:
+    - name: list-all-interfaces
+      command: ifconfig -a
+      description: List all network interfaces using ifconfig -a
+      timeout: 5
+    - name: ping-google.com
+      command: ping -c 3 google.com
+      description: Check external connectivity using a ping command
+      timeout: 5

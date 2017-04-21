@@ -1,0 +1,14 @@
+server:
+    address: 127.0.0.1
+    port: 5050
+    timeout: 5
+    catalog_prefix: /catalog/
+    exec_prefix: /run/
+
+categories:
+    - name: system
+      description: System utils
+      execs: ./system.yaml
+    - name: network
+      description: Network utils
+      execs: ./network.yaml

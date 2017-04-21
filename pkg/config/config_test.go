@@ -2,13 +2,14 @@ package config_test
 
 import (
 	"fmt"
-	"github.com/etombini/http-cmd/pkg/config"
 	"os"
 	"testing"
+
+	"github.com/etombini/http-cmd/pkg/config"
 )
 
 func TestServerConfig(t *testing.T) {
-	config_file := os.Getenv("GOPATH") + "/src/github.com/etombini/http-cmd/test-scripts/http-cmd.conf"
+	config_file := os.Getenv("GOPATH") + "/src/github.com/etombini/http-cmd/test-scripts/http-cmd.yaml"
 
 	cfg := config.GetConfig(config_file)
 

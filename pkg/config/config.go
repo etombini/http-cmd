@@ -10,44 +10,56 @@ import (
 )
 
 const (
-	DefaultConfPath      string = "/etc/http-cmd/http-cmd.conf"
-	DefaultCatalogPath   string = "/etc/http-cmd/http-cmd-catalog.conf"
-	DefaultPort          int    = 5050
-	DefaultAddress       string = "127.0.0.1"
-	DefaultTimeout       int    = 5
-	DefaultDescription   string = "No description provided"
-	DefaultPrefixCatalog string = "/catalog/"
-	DefaultPrefixRun     string = "/run/"
-	LoggerName           string = "config"
+	// DefaultConfPath is the default configuration file path
+	DefaultConfPath string = "/etc/http-cmd/http-cmd.conf"
+	// DefaultCatalogPath is the default path for catalog/categories
+	DefaultCatalogPath string = "/etc/http-cmd/http-cmd-catalog.conf"
+	// DefaultPort is the default port for the server to listen
+	DefaultPort int = 5050
+	// DefaultAddress is the default address the server is binding
+	DefaultAddress string = "127.0.0.1"
+	// DefaultTimeout is the default timeout for command execution
+	DefaultTimeout int = 5
+	// DefaultDescription is the default description for categories and command
+	DefaultDescription string = "No description provided"
+	// DefaultCatalogPrefix is the default URL prefix to reach and show the catalog
+	DefaultCatalogPrefix string = "/catalog/"
+	// DefaultRunPrefix is the default URL prefix to reach command execution
+	DefaultRunPrefix string = "/run/"
+	// LoggerName is the default logger name for this package
+	LoggerName string = "config"
 )
 
-type ServerConfig struct {
+// Server handles server configuration and the catalog of commands
+// to be executed
+type Server struct {
 	FilePath      string
-	CategoryPath  string
 	Port          int
 	Address       string
 	Timeout       int
-	PrefixCatalog string
-	PrefixRun     string
-	Exec          map[string]CategoryConfig
+	CatalogPrefix string
+	RunPrefix     string
+	Categories    []Category
 }
 
-type CategoryConfig struct {
-	Name        string
-	ExecsPath   string
-	Description string
-	Execs       map[string]ExecConfig
+// Category handles a category configuration and affiliated commands
+type Category struct {
+	ExecFilePath string
+	Name         string
+	Description  string
+	Execs        []Exec
 }
 
-type ExecConfig struct {
+// Exec handles a command to be executed by the server
+type Exec struct {
 	Name        string
 	Command     string
-	Description string
 	Timeout     int
+	Description string
 }
 
 //GetConfig returns the server configuration, including categories and executer
-func GetConfig(cfgfile string) *ServerConfig {
+func GetConfig(cfgfile string) *Server {
 	if cfgfile == "" {
 		fmt.Printf("Empty configuration file path, using default %s\n", DefaultConfPath)
 		cfgfile = DefaultConfPath
@@ -56,171 +68,137 @@ func GetConfig(cfgfile string) *ServerConfig {
 		fmt.Fprintf(os.Stderr, "Configuration file %s not found\n", cfgfile)
 		os.Exit(1)
 	}
-	var sc ServerConfig
-	sc.FilePath = cfgfile
-	sc.Port = DefaultPort
-	sc.Address = DefaultAddress
-	sc.Timeout = DefaultTimeout
-	sc.PrefixCatalog = DefaultPrefixCatalog
-	sc.PrefixRun = DefaultPrefixRun
-	if sc.Exec == nil {
-		sc.Exec = make(map[string]CategoryConfig)
-	}
+	dirConfig, _ := filepath.Split(cfgfile)
+	var serverConfig Server
+	serverConfig.FilePath = cfgfile
+	serverConfig.Port = DefaultPort
+	serverConfig.Address = DefaultAddress
+	serverConfig.Timeout = DefaultTimeout
+	serverConfig.CatalogPrefix = DefaultCatalogPrefix
+	serverConfig.RunPrefix = DefaultRunPrefix
+	serverConfig.Categories = make([]Category, 0)
 
-	sc.FilePath = cfgfile
+	serverConfig.FilePath = cfgfile
 
-	server_cfg := viper.New()
-	server_cfg.SetConfigFile(sc.FilePath)
-	server_cfg.SetConfigType("toml")
-	if err := server_cfg.ReadInConfig(); err != nil {
+	vServerConfig := viper.New()
+	vServerConfig.SetConfigFile(serverConfig.FilePath)
+	vServerConfig.SetConfigType("yaml")
+	if err := vServerConfig.ReadInConfig(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	if v := server_cfg.GetString("Server.Catalog"); v != "" {
-		if strings.HasPrefix(v, "/") {
-			sc.CategoryPath = v
-		} else {
-			dir, _ := filepath.Split(sc.FilePath)
-			sc.CategoryPath = dir + v
-		}
+	serverSubConfig := vServerConfig.Sub("server")
+
+	if v := serverSubConfig.GetInt("port"); v != 0 {
+		serverConfig.Port = v
 	}
-	if v := server_cfg.GetInt("Server.Port"); v != 0 {
-		sc.Port = server_cfg.GetInt("Server.Port")
+	if v := serverSubConfig.GetString("address"); v != "" {
+		serverConfig.Address = v
 	}
-	if v := server_cfg.GetString("Server.Address"); v != "" {
-		sc.Address = server_cfg.GetString("Server.Address")
+	if v := serverSubConfig.GetInt("timeout"); v != 0 {
+		serverConfig.Timeout = v
 	}
-	if v := server_cfg.GetInt("Server.Timeout"); v != 0 {
-		sc.Timeout = server_cfg.GetInt("Server.Timeout")
-	}
-	if v := server_cfg.GetString("Server.CatalogPrefix"); v != "" {
+	if v := serverSubConfig.GetString("Server.CatalogPrefix"); v != "" {
 		if !strings.HasPrefix(v, "/") {
 			v = "/" + v
 		}
 		if !strings.HasSuffix(v, "/") {
 			v = v + "/"
 		}
-		sc.PrefixCatalog = v
+		serverConfig.CatalogPrefix = v
 	}
-	if v := server_cfg.GetString("Server.RunPrefix"); v != "" {
+	if v := serverSubConfig.GetString("Server.RunPrefix"); v != "" {
 		if !strings.HasPrefix(v, "/") {
 			v = "/" + v
 		}
 		if !strings.HasSuffix(v, "/") {
 			v = v + "/"
 		}
-		if sc.PrefixCatalog == v {
+		if serverConfig.CatalogPrefix == v {
 			fmt.Println("Catalog prefix can not be the same as Run prefix")
 			os.Exit(1)
 		}
-		sc.PrefixRun = v
+		serverConfig.RunPrefix = v
 	}
 
-	if _, err := os.Stat(sc.CategoryPath); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Category configuration file %s not found\n", sc.CategoryPath)
-		os.Exit(1)
-	}
-
-	category_cfg := viper.New()
-	category_cfg.SetConfigFile(sc.CategoryPath)
-	category_cfg.SetConfigType("toml")
-	if err := category_cfg.ReadInConfig(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	categories := make(map[string]bool)
-	valued_keys := category_cfg.AllKeys()
-	for _, key := range valued_keys {
-		if strings.HasSuffix(key, ".execs") {
-			categories[key[0:len(key)-len(".execs")]] = true
-		}
-	}
-
-	for category := range categories {
-		if strings.Contains(category, "/") {
-			fmt.Fprintf(os.Stderr, "A category name can not contain a \"/\" as in %s\n", category)
-			os.Exit(1)
-		}
-		var cc CategoryConfig
-		cc.Name = category
-		cc.ExecsPath = ""
-		cc.Description = DefaultDescription
-		cc.Execs = make(map[string]ExecConfig)
-
-		if v := category_cfg.GetString(category + ".Description"); v != "" {
-			cc.Description = v
-		}
-		if v := category_cfg.GetString(category + ".Execs"); v != "" {
-			if strings.HasPrefix(v, "/") {
-				cc.ExecsPath = v
-			} else {
-				dir, _ := filepath.Split(sc.CategoryPath)
-				cc.ExecsPath = dir + v
+	categoriesCfg := vServerConfig.Get("categories").([]interface{})
+	for i := range categoriesCfg {
+		var c Category
+		c.Description = DefaultDescription
+		c.Execs = make([]Exec, 0)
+		for k, v := range categoriesCfg[i].(map[interface{}]interface{}) {
+			switch k.(string) {
+			case "name":
+				c.Name = v.(string)
+			case "description":
+				c.Description = v.(string)
+			case "execs":
+				if strings.HasSuffix(v.(string), "/") {
+					c.ExecFilePath = v.(string)
+				} else {
+					c.ExecFilePath = dirConfig + v.(string)
+				}
+			default:
+				fmt.Fprintf(os.Stderr, "Unknown category configuration key %s (%s)\n", k.(string), v.(string))
 			}
-		} else {
-			fmt.Printf("Execs file path for category %s is not set\n", category)
+		}
+		if c.Name == "" {
+			fmt.Fprint(os.Stderr, "A category must have a name\n")
 			os.Exit(1)
 		}
-		sc.Exec[category] = cc
+		if c.ExecFilePath == "" {
+			fmt.Fprintf(os.Stderr, "A category (%s) must refer to a file containing execs\n", c.Name)
+			os.Exit(1)
+		}
+		serverConfig.Categories = append(serverConfig.Categories, c)
 	}
 
-	for category := range sc.Exec {
-		if _, err := os.Stat(sc.Exec[category].ExecsPath); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Configuration file %s not found\n", sc.Exec[category].ExecsPath)
+	for i := range serverConfig.Categories {
+		c := &serverConfig.Categories[i]
+		if _, err := os.Stat(c.ExecFilePath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Exec configuration file %s not found\n", c.ExecFilePath)
 			os.Exit(1)
 		}
-
-		exec_cfg := viper.New()
-		exec_cfg.SetConfigFile(sc.Exec[category].ExecsPath)
-		exec_cfg.SetConfigType("toml")
-		if err := exec_cfg.ReadInConfig(); err != nil {
+		vExecConfig := viper.New()
+		vExecConfig.SetConfigFile(c.ExecFilePath)
+		vExecConfig.SetConfigType("yaml")
+		if err := vExecConfig.ReadInConfig(); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 
-		execs := make(map[string]bool)
-		valued_keys := exec_cfg.AllKeys()
-		for _, key := range valued_keys {
-			if strings.HasSuffix(key, ".command") {
-				execs[key[0:len(key)-len(".command")]] = true
-			}
-		}
+		execsCfg := vExecConfig.Get("execs").([]interface{})
+		for i := range execsCfg {
+			var e Exec
+			e.Description = DefaultDescription
+			e.Timeout = DefaultTimeout
 
-		for exec := range execs {
-			if strings.Contains(exec, "/") {
-				fmt.Fprintf(os.Stderr, "A executer name can not contain a \"/\" as in %s\n", exec)
+			for k, v := range execsCfg[i].(map[interface{}]interface{}) {
+				switch k.(string) {
+				case "name":
+					e.Name = v.(string)
+				case "description":
+					e.Description = v.(string)
+				case "timeout":
+					e.Timeout = v.(int)
+				case "command":
+					e.Command = v.(string)
+				default:
+					fmt.Fprintf(os.Stderr, "Unknown exec configuration key %s (%s)\n", k.(string), v.(string))
+				}
+			}
+			if e.Name == "" {
+				fmt.Fprint(os.Stderr, "An exec must have a name\n")
 				os.Exit(1)
 			}
-			var ec ExecConfig
-			ec.Name = exec
-			ec.Command = ""
-			ec.Description = DefaultDescription
-			ec.Timeout = DefaultTimeout
-
-			if v := exec_cfg.GetString(exec + ".Command"); v != "" {
-				ec.Command = v
-			} else {
-				fmt.Fprintln(os.Stderr, "Command for %s not found in %s", exec, sc.Exec[category].ExecsPath)
+			if e.Command == "" {
+				fmt.Fprintf(os.Stderr, "An exec (%s) must have a command to execute\n", e.Name)
 				os.Exit(1)
 			}
-			if v := exec_cfg.GetString(exec + ".Description"); v != "" {
-				ec.Description = v
-			}
-			if v := exec_cfg.GetInt(exec + ".Timeout"); v != 0 {
-				ec.Timeout = v
-			}
-			sc.Exec[category].Execs[ec.Name] = ec
+			c.Execs = append(c.Execs, e)
 		}
-
 	}
 
-	// for category := range sc.Exec {
-	// 	for exec := range sc.Exec[category].Execs {
-	// 		fmt.Printf("/%s/%s for command %s\n", category, exec, sc.Exec[category].Execs[exec].Command)
-	// 	}
-	// }
-
-	return &sc
+	return &serverConfig
 }

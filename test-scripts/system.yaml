@@ -1,0 +1,9 @@
+execs:
+    - name: list-all-processes
+      command: ps aux
+      description: List all processes using ps aux
+      timeout: 5
+    - name: w
+      command: w
+      description: Display who is logged in and what they are doing
+      timeout: 5

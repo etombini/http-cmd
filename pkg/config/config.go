@@ -2,18 +2,18 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v2"
 )
 
 const (
 	// DefaultConfPath is the default configuration file path
 	DefaultConfPath string = "/etc/http-cmd/http-cmd.conf"
-	// DefaultCatalogPath is the default path for catalog/categories
-	DefaultCatalogPath string = "/etc/http-cmd/http-cmd-catalog.conf"
 	// DefaultPort is the default port for the server to listen
 	DefaultPort int = 5050
 	// DefaultAddress is the default address the server is binding
@@ -24,181 +24,153 @@ const (
 	DefaultDescription string = "No description provided"
 	// DefaultCatalogPrefix is the default URL prefix to reach and show the catalog
 	DefaultCatalogPrefix string = "/catalog/"
-	// DefaultRunPrefix is the default URL prefix to reach command execution
-	DefaultRunPrefix string = "/run/"
+	// DefaultExecPrefix is the default URL prefix to reach command execution
+	DefaultExecPrefix string = "/run/"
 	// LoggerName is the default logger name for this package
 	LoggerName string = "config"
 )
 
-// Server handles server configuration and the catalog of commands
-// to be executed
-type Server struct {
-	FilePath      string
-	Port          int
-	Address       string
-	Timeout       int
-	CatalogPrefix string
-	RunPrefix     string
-	Categories    []Category
+// Config is a structure representing the global application configuration
+type Config struct {
+	Server struct {
+		Address       string `yaml:"address"`
+		Port          int    `yaml:"port"`
+		Timeout       int    `yaml:"timeout"`
+		CatalogPrefix string `yaml:"catalog_prefix"`
+		ExecPrefix    string `yaml:"exec_prefix"`
+	}
+
+	FilePath   string
+	Categories []Category `yaml:"categories"`
 }
 
-// Category handles a category configuration and affiliated commands
+// Category is a structure handling category configuration
 type Category struct {
-	ExecFilePath string
-	Name         string
-	Description  string
-	Execs        []Exec
+	Name          string `yaml:"name"`
+	Description   string `yaml:"description"`
+	ExecsFilePath string `yaml:"path"`
+	Execs         []Exec
 }
 
-// Exec handles a command to be executed by the server
+// Execs is a list of Exec used only to comply to yaml unmarshalling
+type Execs struct {
+	Execs []Exec `yaml:"execs"`
+}
+
+// Exec is a structure handling exec configuration
 type Exec struct {
-	Name        string
-	Command     string
-	Timeout     int
-	Description string
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Command     string `yaml:"command"`
+	Timeout     int    `yaml:"timeout"`
 }
 
-//GetConfig returns the server configuration, including categories and executer
-func GetConfig(cfgfile string) *Server {
-	if cfgfile == "" {
-		fmt.Printf("Empty configuration file path, using default %s\n", DefaultConfPath)
-		cfgfile = DefaultConfPath
+func (c *Config) checkServerDefault() {
+	if c.Server.Address == "" {
+		fmt.Fprintf(os.Stderr, "Address is not set, defaulting to %s\n", DefaultAddress)
+		c.Server.Address = DefaultAddress
 	}
-	if _, err := os.Stat(cfgfile); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Configuration file %s not found\n", cfgfile)
+	if net.ParseIP(c.Server.Address) == nil {
+		fmt.Fprintf(os.Stderr, "Address %s is not a valid IP (v4 or v6) address\n", c.Server.Address)
 		os.Exit(1)
 	}
-	dirConfig, _ := filepath.Split(cfgfile)
-	var serverConfig Server
-	serverConfig.FilePath = cfgfile
-	serverConfig.Port = DefaultPort
-	serverConfig.Address = DefaultAddress
-	serverConfig.Timeout = DefaultTimeout
-	serverConfig.CatalogPrefix = DefaultCatalogPrefix
-	serverConfig.RunPrefix = DefaultRunPrefix
-	serverConfig.Categories = make([]Category, 0)
+	if c.Server.Port <= 0 {
+		fmt.Fprintf(os.Stderr, "Port is not set, defaulting to %d\n", DefaultPort)
+		c.Server.Port = DefaultPort
+	}
+	if c.Server.Timeout <= 0 {
+		fmt.Fprintf(os.Stderr, "Timeout is not set, defaulting to %d\n", DefaultTimeout)
+		c.Server.Port = DefaultTimeout
+	}
+	if c.Server.CatalogPrefix == "" {
+		fmt.Fprintf(os.Stderr, "Catalog prefix is not set, defaulting to %s\n", DefaultCatalogPrefix)
+		c.Server.CatalogPrefix = DefaultCatalogPrefix
+	}
+	if c.Server.ExecPrefix == "" {
+		fmt.Fprintf(os.Stderr, "Exec prefix is not set, defaulting to %s\n", DefaultExecPrefix)
+		c.Server.ExecPrefix = DefaultExecPrefix
+	}
+	if c.Server.CatalogPrefix == c.Server.ExecPrefix {
+		fmt.Fprintf(os.Stderr, "Exec prefix (%s) and Catalog prefix (%s) can not have the same value\n",
+			c.Server.CatalogPrefix,
+			c.Server.ExecPrefix)
+	}
+}
 
-	serverConfig.FilePath = cfgfile
-
-	vServerConfig := viper.New()
-	vServerConfig.SetConfigFile(serverConfig.FilePath)
-	vServerConfig.SetConfigType("yaml")
-	if err := vServerConfig.ReadInConfig(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	serverSubConfig := vServerConfig.Sub("server")
-
-	if v := serverSubConfig.GetInt("port"); v != 0 {
-		serverConfig.Port = v
-	}
-	if v := serverSubConfig.GetString("address"); v != "" {
-		serverConfig.Address = v
-	}
-	if v := serverSubConfig.GetInt("timeout"); v != 0 {
-		serverConfig.Timeout = v
-	}
-	if v := serverSubConfig.GetString("Server.CatalogPrefix"); v != "" {
-		if !strings.HasPrefix(v, "/") {
-			v = "/" + v
-		}
-		if !strings.HasSuffix(v, "/") {
-			v = v + "/"
-		}
-		serverConfig.CatalogPrefix = v
-	}
-	if v := serverSubConfig.GetString("Server.RunPrefix"); v != "" {
-		if !strings.HasPrefix(v, "/") {
-			v = "/" + v
-		}
-		if !strings.HasSuffix(v, "/") {
-			v = v + "/"
-		}
-		if serverConfig.CatalogPrefix == v {
-			fmt.Println("Catalog prefix can not be the same as Run prefix")
+func (c *Config) checkCategoryDuplicates() {
+	m := make(map[string]bool)
+	for i := range c.Categories {
+		category := c.Categories[i].Name
+		if m[category] {
+			fmt.Fprintf(os.Stderr, "Category duplicate found: %s - exiting\n", category)
 			os.Exit(1)
 		}
-		serverConfig.RunPrefix = v
+		m[category] = true
 	}
+}
 
-	categoriesCfg := vServerConfig.Get("categories").([]interface{})
-	for i := range categoriesCfg {
-		var c Category
-		c.Description = DefaultDescription
-		c.Execs = make([]Exec, 0)
-		for k, v := range categoriesCfg[i].(map[interface{}]interface{}) {
-			switch k.(string) {
-			case "name":
-				c.Name = v.(string)
-			case "description":
-				c.Description = v.(string)
-			case "execs":
-				if strings.HasSuffix(v.(string), "/") {
-					c.ExecFilePath = v.(string)
-				} else {
-					c.ExecFilePath = dirConfig + v.(string)
-				}
-			default:
-				fmt.Fprintf(os.Stderr, "Unknown category configuration key %s (%s)\n", k.(string), v.(string))
-			}
+func (c *Config) normalizeExecsPath() {
+	dir, _ := filepath.Split(c.FilePath)
+	for i := range c.Categories {
+		path := c.Categories[i].ExecsFilePath
+		if !strings.HasPrefix(path, "/") {
+			path = dir + path
+			c.Categories[i].ExecsFilePath = path
 		}
-		if c.Name == "" {
-			fmt.Fprint(os.Stderr, "A category must have a name\n")
-			os.Exit(1)
-		}
-		if c.ExecFilePath == "" {
-			fmt.Fprintf(os.Stderr, "A category (%s) must refer to a file containing execs\n", c.Name)
-			os.Exit(1)
-		}
-		serverConfig.Categories = append(serverConfig.Categories, c)
 	}
+}
 
-	for i := range serverConfig.Categories {
-		c := &serverConfig.Categories[i]
-		if _, err := os.Stat(c.ExecFilePath); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Exec configuration file %s not found\n", c.ExecFilePath)
+func (c *Config) loadExecs() {
+	for i := range c.Categories {
+		ePath := c.Categories[i].ExecsFilePath
+		if _, err := os.Stat(ePath); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "Exec path %s in category %s does not exist",
+				ePath, c.Categories[i].Name)
 			os.Exit(1)
 		}
-		vExecConfig := viper.New()
-		vExecConfig.SetConfigFile(c.ExecFilePath)
-		vExecConfig.SetConfigType("yaml")
-		if err := vExecConfig.ReadInConfig(); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+		config, err := ioutil.ReadFile(ePath)
+		if err != nil {
+			panic(err)
 		}
-
-		execsCfg := vExecConfig.Get("execs").([]interface{})
-		for i := range execsCfg {
-			var e Exec
-			e.Description = DefaultDescription
-			e.Timeout = DefaultTimeout
-
-			for k, v := range execsCfg[i].(map[interface{}]interface{}) {
-				switch k.(string) {
-				case "name":
-					e.Name = v.(string)
-				case "description":
-					e.Description = v.(string)
-				case "timeout":
-					e.Timeout = v.(int)
-				case "command":
-					e.Command = v.(string)
-				default:
-					fmt.Fprintf(os.Stderr, "Unknown exec configuration key %s (%s)\n", k.(string), v.(string))
-				}
-			}
-			if e.Name == "" {
-				fmt.Fprint(os.Stderr, "An exec must have a name\n")
+		eConfig := Execs{}
+		if err := yaml.Unmarshal(config, &eConfig); err != nil {
+			panic(err)
+		}
+		//TODO: check for empty name -> Create 2 functions : checkExecsDuplicates & validateExecFormat (and Category as well)
+		// check for duplicates
+		m := make(map[string]bool)
+		for j := range eConfig.Execs {
+			name := eConfig.Execs[j].Name
+			if m[name] {
+				fmt.Fprintf(os.Stderr, "Exec duplicate found (%s) in category %s (%s)\n",
+					name, c.Categories[i].Name, c.Categories[i].ExecsFilePath)
 				os.Exit(1)
 			}
-			if e.Command == "" {
-				fmt.Fprintf(os.Stderr, "An exec (%s) must have a command to execute\n", e.Name)
-				os.Exit(1)
-			}
-			c.Execs = append(c.Execs, e)
+			m[name] = true
 		}
+		c.Categories[i].Execs = eConfig.Execs
+	}
+}
+
+// New return a new Config structure, loaded according to a configuration file
+func New(filename string) *Config {
+	// TODO: change this ckeck to a better one (using the default configuration path)
+	config, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
 	}
 
-	return &serverConfig
+	cfg := Config{}
+	if err := yaml.Unmarshal(config, &cfg); err != nil {
+		panic(err)
+	}
+	cfg.FilePath = filename
+
+	cfg.checkServerDefault()
+	cfg.checkCategoryDuplicates()
+	cfg.normalizeExecsPath()
+
+	cfg.loadExecs()
+
+	return &cfg
 }

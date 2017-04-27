@@ -8,24 +8,26 @@ import (
 	"time"
 )
 
+// Harvest is the result of an execution done by the function Reaper
 type Harvest struct {
-	Cmdline         string
-	Return_code     int
-	Timeout_reached bool
-	Pid             int
-	Stdout          string
-	Stderr          string
+	Command        string
+	ReturnCode     int
+	TimeoutReached bool
+	Pid            int
+	Stdout         string
+	Stderr         string
 }
 
+// Reaper execute a program with is parameters as a string, with a timeout limiting execution time
 func Reaper(cmdline string, timeout int) Harvest {
 	//cmdline = "sh -c " + cmdline
-	cmd_split := strings.Split(strings.TrimSpace(cmdline), " ")
+	cmdSplit := strings.Split(strings.TrimSpace(cmdline), " ")
 
 	var cmd *exec.Cmd
-	if len(cmd_split) > 1 {
-		cmd = exec.Command(cmd_split[0], cmd_split[1:]...)
+	if len(cmdSplit) > 1 {
+		cmd = exec.Command(cmdSplit[0], cmdSplit[1:]...)
 	} else {
-		cmd = exec.Command(cmd_split[0])
+		cmd = exec.Command(cmdSplit[0])
 	}
 
 	var stdout bytes.Buffer
@@ -38,9 +40,10 @@ func Reaper(cmdline string, timeout int) Harvest {
 	}
 
 	var h Harvest
+	h.Command = cmdline
 	h.Pid = cmd.Process.Pid
-	h.Return_code = 0
-	h.Timeout_reached = false
+	h.ReturnCode = 0
+	h.TimeoutReached = false
 
 	done := make(chan error, 1)
 	go func() {
@@ -52,8 +55,8 @@ func Reaper(cmdline string, timeout int) Harvest {
 		if err := cmd.Process.Kill(); err != nil {
 			fmt.Println("Some error happened when trying to kill the process")
 		}
-		h.Return_code = 127
-		h.Timeout_reached = true
+		h.ReturnCode = 127
+		h.TimeoutReached = true
 
 	case err := <-done:
 		if err != nil {

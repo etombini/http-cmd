@@ -7,3 +7,7 @@ execs:
       command: ping -c 3 google.com
       description: Check external connectivity using a ping command
       timeout: 5
+    - name: ping-yahoo.com
+      command: ping -c 3 yahoo.com
+      description: Check external connectivity using a ping command
+      timeout: 5

@@ -6,14 +6,15 @@ import (
 
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/etombini/http-cmd/pkg/config"
 	"github.com/etombini/http-cmd/pkg/hangman"
 )
 
 type execHandler struct {
-	pattern string
-	handler func(http.ResponseWriter, *http.Request)
+	pattern *string
+	handler *func(http.ResponseWriter, *http.Request)
 }
 
 type catalogHandler execHandler
@@ -22,17 +23,25 @@ func execHandlerGenerator(config config.Config) []execHandler {
 	ehs := make([]execHandler, 0)
 	for i := range config.Categories {
 		for j := range config.Categories[i].Execs {
-			pattern := config.Server.ExecPrefix + config.Categories[i].Name + "/" + config.Categories[i].Execs[j].Name
-			handler := func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != pattern {
+			pattern := new(string)
+			*pattern = config.Server.ExecPrefix + config.Categories[i].Name + "/" + config.Categories[i].Execs[j].Name
+			command := new(string)
+			*command = config.Categories[i].Execs[j].Command
+			timeout := new(int)
+			*timeout = config.Categories[i].Execs[j].Timeout
+			handler := new(func(http.ResponseWriter, *http.Request))
+			*handler = func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != *pattern {
 					http.NotFound(w, r)
-					fmt.Fprintf(os.Stderr, "Invalid URL for command execution (%s)\n", r.URL.Path)
+					fmt.Fprintf(os.Stderr, "Invalid URL for command execution (got %s expecting %s)\n", r.URL.Path, *pattern)
+					return
 				}
-				h := hangman.Reaper(config.Categories[i].Execs[j].Command, config.Categories[i].Execs[j].Timeout)
+				h := hangman.Reaper(*command, *timeout)
 				js, err := json.Marshal(h)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					fmt.Fprintf(os.Stderr, "Error while converting execution result to json: %+v", h)
+					return
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.Write(js)
@@ -72,19 +81,25 @@ func catalogHandlerGenerator(config config.Config) []catalogHandler {
 	}
 	cPattern := config.Server.CatalogPrefix
 	cHandler := func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 		if r.URL.Path != cPattern {
 			http.NotFound(w, r)
 			fmt.Fprintf(os.Stderr, "Invalid URL for command execution (%s)\n", r.URL.Path)
+			return
 		}
 		js, err := json.Marshal(c4j)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			fmt.Fprintf(os.Stderr, "Error while generating global catalog\n")
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(js)
 	}
-	ch := catalogHandler{cPattern, cHandler}
+	ch := catalogHandler{&cPattern, &cHandler}
 	chs = append(chs, ch)
 
 	for i := range config.Categories {
@@ -98,24 +113,49 @@ func catalogHandlerGenerator(config config.Config) []catalogHandler {
 			e4j = append(e4j, e)
 		}
 		ecHandler := func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "GET" {
+				http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
 			if r.URL.Path != ecPattern {
 				http.NotFound(w, r)
 				fmt.Fprintf(os.Stderr, "Invalid URL for exec catalog (%s)\n", r.URL.Path)
+				return
 			}
 			js, err := json.Marshal(e4j)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				fmt.Fprintf(os.Stderr, "Error while generating execs catalog\n")
+				return
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.Write(js)
 		}
-		ech := catalogHandler{ecPattern, ecHandler}
+		ech := catalogHandler{&ecPattern, &ecHandler}
 		chs = append(chs, ech)
 	}
 	return chs
 }
 
-// func Run(config config.ServerConfig) {
+// Run start the server using proper configuration
+func Run(config config.Config) {
 
-// }
+	ch := catalogHandlerGenerator(config)
+	for i := range ch {
+		http.HandleFunc(*ch[i].pattern, *ch[i].handler)
+	}
+
+	eh := execHandlerGenerator(config)
+	for i := range eh {
+		http.HandleFunc(*eh[i].pattern, *eh[i].handler)
+	}
+
+	err := http.ListenAndServe(config.Server.Address+":"+strconv.Itoa(config.Server.Port), nil)
+	fmt.Printf("DEBUG: Server failed %s\n", err)
+}
+
+func main() {
+	config := config.New("/Users/elvis/etoinc/go/src/github.com/etombini/http-cmd/test-scripts/http-cmd.yaml")
+	Run(*config)
+
+}

@@ -86,9 +86,21 @@ func (c *Config) checkServerDefault() {
 		fmt.Fprintf(os.Stderr, "Catalog prefix is not set, defaulting to %s\n", DefaultCatalogPrefix)
 		c.Server.CatalogPrefix = DefaultCatalogPrefix
 	}
+	if !strings.HasPrefix(c.Server.CatalogPrefix, "/") {
+		c.Server.CatalogPrefix = "/" + c.Server.CatalogPrefix
+	}
+	if !strings.HasSuffix(c.Server.CatalogPrefix, "/") {
+		c.Server.CatalogPrefix = c.Server.CatalogPrefix + "/"
+	}
 	if c.Server.ExecPrefix == "" {
 		fmt.Fprintf(os.Stderr, "Exec prefix is not set, defaulting to %s\n", DefaultExecPrefix)
 		c.Server.ExecPrefix = DefaultExecPrefix
+	}
+	if !strings.HasPrefix(c.Server.ExecPrefix, "/") {
+		c.Server.ExecPrefix = "/" + c.Server.ExecPrefix
+	}
+	if !strings.HasSuffix(c.Server.ExecPrefix, "/") {
+		c.Server.ExecPrefix = c.Server.ExecPrefix + "/"
 	}
 	if c.Server.CatalogPrefix == c.Server.ExecPrefix {
 		fmt.Fprintf(os.Stderr, "Exec prefix (%s) and Catalog prefix (%s) can not have the same value\n",
@@ -154,7 +166,6 @@ func (c *Config) loadExecs() {
 
 // New return a new Config structure, loaded according to a configuration file
 func New(filename string) *Config {
-	// TODO: change this ckeck to a better one (using the default configuration path)
 	config, err := ioutil.ReadFile(filename)
 	if err != nil {
 		panic(err)

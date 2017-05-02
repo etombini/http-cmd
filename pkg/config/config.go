@@ -121,6 +121,19 @@ func (c *Config) checkCategoryDuplicates() {
 	}
 }
 
+func (c *Config) checkCategoryNames() {
+	for i := range c.Categories {
+		if strings.Contains(c.Categories[i].Name, "/") {
+			fmt.Fprintf(os.Stderr, "Category name (%s) must not contain a \"/\"\n", c.Categories[i].Name)
+			os.Exit(1)
+		}
+		if c.Categories[i].Name == "" {
+			fmt.Fprintf(os.Stderr, "Category name can not be an empty string\n")
+			os.Exit(1)
+		}
+	}
+}
+
 func (c *Config) normalizeExecsPath() {
 	dir, _ := filepath.Split(c.FilePath)
 	for i := range c.Categories {
@@ -148,7 +161,6 @@ func (c *Config) loadExecs() {
 		if err := yaml.Unmarshal(config, &eConfig); err != nil {
 			panic(err)
 		}
-		//TODO: check for empty name -> Create 2 functions : checkExecsDuplicates & validateExecFormat (and Category as well)
 		// check for duplicates
 		m := make(map[string]bool)
 		for j := range eConfig.Execs {
@@ -161,6 +173,21 @@ func (c *Config) loadExecs() {
 			m[name] = true
 		}
 		c.Categories[i].Execs = eConfig.Execs
+	}
+}
+
+func (c *Config) checkExecNames() {
+	for i := range c.Categories {
+		for j := range c.Categories[i].Execs {
+			if strings.Contains(c.Categories[i].Execs[j].Name, "/") {
+				fmt.Fprintf(os.Stderr, "Exec name (%s) must not contain a \"/\"\n", c.Categories[i].Execs[j].Name)
+				os.Exit(1)
+			}
+			if c.Categories[i].Execs[j].Name == "" {
+				fmt.Fprintf(os.Stderr, "Category name can not be an empty string\n")
+				os.Exit(1)
+			}
+		}
 	}
 }
 
@@ -178,10 +205,14 @@ func New(filename string) *Config {
 	cfg.FilePath = filename
 
 	cfg.checkServerDefault()
+
+	cfg.checkCategoryNames()
 	cfg.checkCategoryDuplicates()
+
 	cfg.normalizeExecsPath()
 
 	cfg.loadExecs()
+	cfg.checkExecNames()
 
 	return &cfg
 }

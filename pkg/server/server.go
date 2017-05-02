@@ -153,9 +153,3 @@ func Run(config config.Config) {
 	err := http.ListenAndServe(config.Server.Address+":"+strconv.Itoa(config.Server.Port), nil)
 	fmt.Printf("DEBUG: Server failed %s\n", err)
 }
-
-func main() {
-	config := config.New("/Users/elvis/etoinc/go/src/github.com/etombini/http-cmd/test-scripts/http-cmd.yaml")
-	Run(*config)
-
-}

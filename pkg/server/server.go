@@ -19,6 +19,8 @@ type execHandler struct {
 
 type catalogHandler execHandler
 
+// execHandlerGenerator returns a list of struct execHandler.
+// Each struct contains an URL and a function which is a http.Handler
 func execHandlerGenerator(config config.Config) []execHandler {
 	ehs := make([]execHandler, 0)
 	for i := range config.Categories {
@@ -30,7 +32,13 @@ func execHandlerGenerator(config config.Config) []execHandler {
 			timeout := new(int)
 			*timeout = config.Categories[i].Execs[j].Timeout
 			handler := new(func(http.ResponseWriter, *http.Request))
+
+			// Generating the Handler func
 			*handler = func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" {
+					http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
 				if r.URL.Path != *pattern {
 					http.NotFound(w, r)
 					fmt.Fprintf(os.Stderr, "Invalid URL for command execution (got %s expecting %s)\n", r.URL.Path, *pattern)
@@ -71,6 +79,8 @@ type catalog4JSON struct {
 	Description string
 }
 
+// catalogHandlerGenerator returns a list of struct catalogHandler.
+// Each struct contains an URL and a function which is a http.Handler
 func catalogHandlerGenerator(config config.Config) []catalogHandler {
 	chs := make([]catalogHandler, 0)
 
@@ -80,6 +90,8 @@ func catalogHandlerGenerator(config config.Config) []catalogHandler {
 		c4j = append(c4j, c)
 	}
 	cPattern := config.Server.CatalogPrefix
+
+	// Generating the Handler func for the first catalog level
 	cHandler := func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
@@ -112,6 +124,8 @@ func catalogHandlerGenerator(config config.Config) []catalogHandler {
 				config.Categories[i].Execs[j].Timeout}
 			e4j = append(e4j, e)
 		}
+
+		// Generating the Handler func for each catalog category
 		ecHandler := func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != "GET" {
 				http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
@@ -137,7 +151,7 @@ func catalogHandlerGenerator(config config.Config) []catalogHandler {
 	return chs
 }
 
-// Run start the server using proper configuration
+// Run starts the server using proper configuration
 func Run(config config.Config) {
 
 	ch := catalogHandlerGenerator(config)

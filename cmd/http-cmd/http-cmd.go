@@ -12,7 +12,7 @@ var v string
 
 // Version returns the version of this application (SemVer format)
 // It depends on -ldflags at build time :
-// -ldflags "-X github.com/etombini/http-cmd=v1.2.3"
+// -ldflags "-X github.com/etombini/http-cmd.v=v1.2.3"
 // If not set during the build, it defaults to v0.0.0
 func version() string {
 	if v == "" {

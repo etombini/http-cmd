@@ -155,11 +155,13 @@ func (c *Config) loadExecs() {
 		}
 		config, err := ioutil.ReadFile(ePath)
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "Can not find or open configuration file %s - %s\n", ePath, err.Error())
+			os.Exit(1)
 		}
 		eConfig := Execs{}
 		if err := yaml.Unmarshal(config, &eConfig); err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "Can not parse configuration file %s - %s\n", ePath, err.Error())
+			os.Exit(1)
 		}
 		// check for duplicates
 		m := make(map[string]bool)
@@ -195,12 +197,14 @@ func (c *Config) checkExecNames() {
 func New(filename string) *Config {
 	config, err := ioutil.ReadFile(filename)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Can not find or open configuration file %s\n", filename)
+		os.Exit(1)
 	}
 
 	cfg := Config{}
 	if err := yaml.Unmarshal(config, &cfg); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Can not parse configuration file %s - %s\n", filename, err.Error())
+		os.Exit(1)
 	}
 	cfg.FilePath = filename
 

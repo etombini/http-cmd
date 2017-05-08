@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 
+	"os"
+
 	"github.com/etombini/http-cmd/pkg/config"
 	"github.com/etombini/http-cmd/pkg/server"
 )
@@ -34,7 +36,11 @@ func main() {
 	}
 
 	fmt.Println("config: ", *configFlag)
-	cfg := config.New(*configFlag)
+	cfg, err := config.New(*configFlag)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 
 	server.Run(*cfg)
 }

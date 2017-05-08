@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"errors"
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -65,14 +67,14 @@ type Exec struct {
 	Timeout     int    `yaml:"timeout"`
 }
 
-func (c *Config) checkServerDefault() {
+func checkServerDefault(c *Config) error {
 	if c.Server.Address == "" {
 		fmt.Fprintf(os.Stderr, "Address is not set, defaulting to %s\n", DefaultAddress)
 		c.Server.Address = DefaultAddress
 	}
 	if net.ParseIP(c.Server.Address) == nil {
 		fmt.Fprintf(os.Stderr, "Address %s is not a valid IP (v4 or v6) address\n", c.Server.Address)
-		os.Exit(1)
+		return errors.New("Address " + c.Server.Address + " is not a valid IP (v4 or v6) address")
 	}
 	if c.Server.Port <= 0 {
 		fmt.Fprintf(os.Stderr, "Port is not set, defaulting to %d\n", DefaultPort)
@@ -107,34 +109,37 @@ func (c *Config) checkServerDefault() {
 			c.Server.CatalogPrefix,
 			c.Server.ExecPrefix)
 	}
+	return nil
 }
 
-func (c *Config) checkCategoryDuplicates() {
+func checkCategoryDuplicates(c *Config) error {
 	m := make(map[string]bool)
 	for i := range c.Categories {
 		category := c.Categories[i].Name
 		if m[category] {
 			fmt.Fprintf(os.Stderr, "Category duplicate found: %s - exiting\n", category)
-			os.Exit(1)
+			return errors.New("Category duplicate found: " + category + " - exiting")
 		}
 		m[category] = true
 	}
+	return nil
 }
 
-func (c *Config) checkCategoryNames() {
+func checkCategoryNames(c *Config) error {
 	for i := range c.Categories {
 		if strings.Contains(c.Categories[i].Name, "/") {
 			fmt.Fprintf(os.Stderr, "Category name (%s) must not contain a \"/\"\n", c.Categories[i].Name)
-			os.Exit(1)
+			return errors.New("Category name (" + c.Categories[i].Name + ") must not contain a \"/\"")
 		}
 		if c.Categories[i].Name == "" {
 			fmt.Fprintf(os.Stderr, "Category name can not be an empty string\n")
-			os.Exit(1)
+			return errors.New("Category name can not be an empty string")
 		}
 	}
+	return nil
 }
 
-func (c *Config) normalizeExecsPath() {
+func normalizeExecsPath(c *Config) error {
 	dir, _ := filepath.Split(c.FilePath)
 	for i := range c.Categories {
 		path := c.Categories[i].ExecsFilePath
@@ -143,25 +148,26 @@ func (c *Config) normalizeExecsPath() {
 			c.Categories[i].ExecsFilePath = path
 		}
 	}
+	return nil
 }
 
-func (c *Config) loadExecs() {
+func loadExecs(c *Config) error {
 	for i := range c.Categories {
 		ePath := c.Categories[i].ExecsFilePath
 		if _, err := os.Stat(ePath); os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "Exec path %s in category %s does not exist",
+			fmt.Fprintf(os.Stderr, "Exec path %s in category %s does not exist\n",
 				ePath, c.Categories[i].Name)
-			os.Exit(1)
+			return errors.New("Exec path " + ePath + " in category " + c.Categories[i].Name + " does not exist")
 		}
 		config, err := ioutil.ReadFile(ePath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Can not find or open configuration file %s - %s\n", ePath, err.Error())
-			os.Exit(1)
+			return errors.New("Can not find or open configuration file " + ePath + ": " + err.Error())
 		}
 		eConfig := Execs{}
 		if err := yaml.Unmarshal(config, &eConfig); err != nil {
 			fmt.Fprintf(os.Stderr, "Can not parse configuration file %s - %s\n", ePath, err.Error())
-			os.Exit(1)
+			return errors.New("Can not parse configuration file " + ePath + ": " + err.Error())
 		}
 		// check for duplicates
 		m := make(map[string]bool)
@@ -170,53 +176,64 @@ func (c *Config) loadExecs() {
 			if m[name] {
 				fmt.Fprintf(os.Stderr, "Exec duplicate found (%s) in category %s (%s)\n",
 					name, c.Categories[i].Name, c.Categories[i].ExecsFilePath)
-				os.Exit(1)
+				return errors.New("Exec duplicate found (" + name + ") in category " + c.Categories[i].Name + " (" + c.Categories[i].ExecsFilePath + ")")
 			}
 			m[name] = true
 		}
 		c.Categories[i].Execs = eConfig.Execs
 	}
+	return nil
 }
 
-func (c *Config) checkExecNames() {
+func checkExecNames(c *Config) error {
 	for i := range c.Categories {
 		for j := range c.Categories[i].Execs {
 			if strings.Contains(c.Categories[i].Execs[j].Name, "/") {
 				fmt.Fprintf(os.Stderr, "Exec name (%s) must not contain a \"/\"\n", c.Categories[i].Execs[j].Name)
-				os.Exit(1)
+				return errors.New("Exec name (" + c.Categories[i].Execs[j].Name + ") must not contain a \"/\"")
 			}
 			if c.Categories[i].Execs[j].Name == "" {
 				fmt.Fprintf(os.Stderr, "Category name can not be an empty string\n")
-				os.Exit(1)
+				return errors.New("Category name can not be an empty string")
 			}
 		}
 	}
+	return nil
 }
 
 // New return a new Config structure, loaded according to a configuration file
-func New(filename string) *Config {
+func New(filename string) (*Config, error) {
 	config, err := ioutil.ReadFile(filename)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Can not find or open configuration file %s\n", filename)
-		os.Exit(1)
+		return nil, err
 	}
 
 	cfg := Config{}
 	if err := yaml.Unmarshal(config, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Can not parse configuration file %s - %s\n", filename, err.Error())
-		os.Exit(1)
+		return nil, err
 	}
 	cfg.FilePath = filename
 
-	cfg.checkServerDefault()
+	if err := checkServerDefault(&cfg); err != nil {
+		return nil, err
+	}
+	if err := checkCategoryNames(&cfg); err != nil {
+		return nil, err
+	}
+	if err := checkCategoryDuplicates(&cfg); err != nil {
+		return nil, err
+	}
+	if err := normalizeExecsPath(&cfg); err != nil {
+		return nil, err
+	}
+	if err := loadExecs(&cfg); err != nil {
+		return nil, err
+	}
+	if err := checkExecNames(&cfg); err != nil {
+		return nil, err
+	}
 
-	cfg.checkCategoryNames()
-	cfg.checkCategoryDuplicates()
-
-	cfg.normalizeExecsPath()
-
-	cfg.loadExecs()
-	cfg.checkExecNames()
-
-	return &cfg
+	return &cfg, nil
 }

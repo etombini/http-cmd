@@ -10,7 +10,7 @@ import (
 
 	"errors"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 const (
@@ -36,7 +36,7 @@ const (
 type Config struct {
 	Server struct {
 		Address       string `yaml:"address"`
-		Port          int    `yaml:"port"`
+		Port          uint32 `yaml:"port"`
 		Timeout       int    `yaml:"timeout"`
 		CatalogPrefix string `yaml:"catalog_prefix"`
 		ExecPrefix    string `yaml:"exec_prefix"`
@@ -76,9 +76,13 @@ func checkServerDefault(c *Config) error {
 		fmt.Fprintf(os.Stderr, "Address %s is not a valid IP (v4 or v6) address\n", c.Server.Address)
 		return errors.New("Address " + c.Server.Address + " is not a valid IP (v4 or v6) address")
 	}
-	if c.Server.Port <= 0 {
+	if c.Server.Port == 0 {
 		fmt.Fprintf(os.Stderr, "Port is not set, defaulting to %d\n", DefaultPort)
 		c.Server.Port = DefaultPort
+	}
+	if c.Server.Port < 0 || c.Server.Port > 65535 {
+		fmt.Fprintf(os.Stderr, "Port number must be in 1-65535\n")
+		return errors.New("Port number must be in 1-65535")
 	}
 	if c.Server.Timeout <= 0 {
 		fmt.Fprintf(os.Stderr, "Timeout is not set, defaulting to %d\n", DefaultTimeout)

@@ -17,7 +17,7 @@ const (
 	// DefaultConfPath is the default configuration file path
 	DefaultConfPath string = "/etc/http-cmd/http-cmd.conf"
 	// DefaultPort is the default port for the server to listen
-	DefaultPort int = 5050
+	DefaultPort uint32 = 5050
 	// DefaultAddress is the default address the server is binding
 	DefaultAddress string = "127.0.0.1"
 	// DefaultTimeout is the default timeout for command execution
@@ -86,7 +86,7 @@ func checkServerDefault(c *Config) error {
 	}
 	if c.Server.Timeout <= 0 {
 		fmt.Fprintf(os.Stderr, "Timeout is not set, defaulting to %d\n", DefaultTimeout)
-		c.Server.Port = DefaultTimeout
+		c.Server.Timeout = DefaultTimeout
 	}
 	if c.Server.CatalogPrefix == "" {
 		fmt.Fprintf(os.Stderr, "Catalog prefix is not set, defaulting to %s\n", DefaultCatalogPrefix)

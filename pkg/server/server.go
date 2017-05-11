@@ -164,6 +164,6 @@ func Run(config config.Config) {
 		http.HandleFunc(*eh[i].pattern, *eh[i].handler)
 	}
 
-	err := http.ListenAndServe(config.Server.Address+":"+strconv.Itoa(config.Server.Port), nil)
+	err := http.ListenAndServe(config.Server.Address+":"+strconv.Itoa(int(config.Server.Port)), nil)
 	fmt.Printf("DEBUG: Server failed %s\n", err)
 }

@@ -21,7 +21,7 @@ const (
 	// DefaultAddress is the default address the server is binding
 	DefaultAddress string = "127.0.0.1"
 	// DefaultTimeout is the default timeout for command execution
-	DefaultTimeout int = 5
+	DefaultTimeout uint32 = 5
 	// DefaultDescription is the default description for categories and command
 	DefaultDescription string = "No description provided"
 	// DefaultCatalogPrefix is the default URL prefix to reach and show the catalog
@@ -37,7 +37,7 @@ type Config struct {
 	Server struct {
 		Address       string `yaml:"address"`
 		Port          uint32 `yaml:"port"`
-		Timeout       int    `yaml:"timeout"`
+		Timeout       uint32 `yaml:"timeout"`
 		CatalogPrefix string `yaml:"catalog_prefix"`
 		ExecPrefix    string `yaml:"exec_prefix"`
 	}

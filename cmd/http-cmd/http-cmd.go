@@ -10,17 +10,23 @@ import (
 	"github.com/etombini/http-cmd/pkg/server"
 )
 
-var v string
+var (
+	v string
+	b string
+)
 
-// Version returns the version of this application (SemVer format)
-// It depends on -ldflags at build time :
-// -ldflags "-X github.com/etombini/http-cmd.v=v1.2.3"
-// If not set during the build, it defaults to v0.0.0
 func version() string {
 	if v == "" {
 		v = "v0.0.0"
 	}
 	return v
+}
+
+func build() string {
+	if b == "" {
+		b = "Unknown"
+	}
+	return b
 }
 
 func main() {
@@ -30,15 +36,15 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		v := version()
-		fmt.Printf("Version %s", v)
+		fmt.Printf("Version %s\n", version())
+		fmt.Printf("Build: %s\n", build())
 		return
 	}
 
 	fmt.Println("config: ", *configFlag)
 	cfg, err := config.New(*configFlag)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
 	}
 

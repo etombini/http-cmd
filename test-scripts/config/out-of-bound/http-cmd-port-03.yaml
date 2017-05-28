@@ -1,8 +1,4 @@
 server:
-    address: 555.555.555.555
-    port: 5151
-    timeout: 10
-    catalog_prefix: c
-    exec_prefix: r
-
+    port: 5151.5
+    
 categories:

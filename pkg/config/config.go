@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -30,6 +31,8 @@ const (
 	DefaultExecPrefix string = "/run/"
 	// LoggerName is the default logger name for this package
 	LoggerName string = "config"
+	//DefaultUser is the default user id which runs http-cmd application
+	DefaultUser string = "http-cmd"
 )
 
 // Config is a structure representing the global application configuration
@@ -40,6 +43,7 @@ type Config struct {
 		Timeout       uint32 `yaml:"timeout"`
 		CatalogPrefix string `yaml:"catalog_prefix"`
 		ExecPrefix    string `yaml:"exec_prefix"`
+		User          string `yaml:"user"`
 	}
 
 	FilePath   string
@@ -113,6 +117,19 @@ func checkServerDefault(c *Config) error {
 			c.Server.CatalogPrefix,
 			c.Server.ExecPrefix)
 	}
+	if c.Server.User == "" {
+		fmt.Fprintf(os.Stderr, "User is not set, defaulting to %s\n", DefaultUser)
+		c.Server.User = DefaultUser
+	}
+
+	user, err := user.Current()
+	if err != nil {
+		return errors.New("Can not get uid of the process owner")
+	}
+	if user.Username != c.Server.User {
+		return errors.New("User defined in configuration (" + c.Server.User + ") is not running the application (" + user.Username + ")")
+	}
+
 	return nil
 }
 

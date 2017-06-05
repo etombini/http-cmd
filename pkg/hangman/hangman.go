@@ -3,7 +3,9 @@ package hangman
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -41,8 +43,14 @@ func Reaper(cmdline string, timeout int) Harvest {
 
 	var h Harvest
 	h.Command = cmdline
-	h.Pid = cmd.Process.Pid
-	h.ReturnCode = 0
+	if cmd.Process == nil {
+		fmt.Fprintf(os.Stderr, "Process is nil, there is a problem\n")
+		h.Pid = -1
+		h.ReturnCode = 666
+	} else {
+		h.Pid = cmd.Process.Pid
+		h.ReturnCode = 0
+	}
 	h.TimeoutReached = false
 
 	done := make(chan error, 1)
@@ -57,15 +65,27 @@ func Reaper(cmdline string, timeout int) Harvest {
 		}
 		h.ReturnCode = 127
 		h.TimeoutReached = true
+		h.Stderr = stderr.String()
+		h.Stdout = stdout.String()
 
 	case err := <-done:
 		if err != nil {
-			fmt.Printf("process done with error = %v", err)
+			fmt.Fprintf(os.Stderr, "Command \"%s\" returned an error = %s\n", h.Command, err.Error())
+			if strings.HasPrefix(err.Error(), "exit status") {
+				h.ReturnCode, _ = strconv.Atoi(err.Error()[12:])
+			} else {
+				h.ReturnCode = 666
+			}
+			h.Stderr = err.Error()
+			if stderr.String() != "" {
+				h.Stderr = h.Stderr + "\n" + stderr.String()
+			}
+		} else {
+			h.ReturnCode = 0
+			h.Stderr = stderr.String()
 		}
+		h.Stdout = stdout.String()
 	}
-
-	h.Stdout = stdout.String()
-	h.Stderr = stderr.String()
 
 	return h
 }

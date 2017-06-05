@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"errors"
@@ -210,6 +211,8 @@ func loadExecs(c *Config) error {
 				eConfig.Execs[j].Timeout = c.Server.Timeout
 			}
 		}
+		// sort execs
+		sort.Slice(eConfig.Execs, func(i, j int) bool { return eConfig.Execs[i].Name < eConfig.Execs[j].Name })
 		c.Categories[i].Execs = eConfig.Execs
 	}
 	return nil
@@ -245,6 +248,9 @@ func New(filename string) (*Config, error) {
 		return nil, err
 	}
 	cfg.FilePath = filename
+
+	// sort Categories by name
+	sort.Slice(cfg.Categories, func(i, j int) bool { return cfg.Categories[i].Name < cfg.Categories[j].Name })
 
 	if err := checkServerDefault(&cfg); err != nil {
 		return nil, err

@@ -8,26 +8,8 @@ import (
 
 	"github.com/etombini/http-cmd/pkg/config"
 	"github.com/etombini/http-cmd/pkg/server"
+	"github.com/etombini/http-cmd/pkg/version"
 )
-
-var (
-	v string
-	b string
-)
-
-func version() string {
-	if v == "" {
-		v = "v0.0.0"
-	}
-	return v
-}
-
-func build() string {
-	if b == "" {
-		b = "Unknown"
-	}
-	return b
-}
 
 func main() {
 
@@ -36,12 +18,11 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Printf("Version %s\n", version())
-		fmt.Printf("Build: %s\n", build())
+		fmt.Printf("Version:\t%s\n", version.Version())
+		fmt.Printf("Build:  \t%s\n", version.Build())
 		return
 	}
 
-	fmt.Println("config: ", *configFlag)
 	cfg, err := config.New(*configFlag)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())

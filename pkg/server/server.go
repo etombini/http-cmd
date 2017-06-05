@@ -29,7 +29,7 @@ func execHandlerGenerator(config config.Config) []execHandler {
 			*pattern = config.Server.ExecPrefix + config.Categories[i].Name + "/" + config.Categories[i].Execs[j].Name
 			command := new(string)
 			*command = config.Categories[i].Execs[j].Command
-			timeout := new(int)
+			timeout := new(uint32)
 			*timeout = config.Categories[i].Execs[j].Timeout
 			handler := new(func(http.ResponseWriter, *http.Request))
 
@@ -65,7 +65,7 @@ type exec4JSON struct {
 	Name        string
 	Description string
 	Command     string
-	Timeout     int
+	Timeout     uint32
 }
 
 type execCatalog4JSON struct {

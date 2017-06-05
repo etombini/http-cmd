@@ -21,7 +21,7 @@ type Harvest struct {
 }
 
 // Reaper execute a program with is parameters as a string, with a timeout limiting execution time
-func Reaper(cmdline string, timeout int) Harvest {
+func Reaper(cmdline string, timeout uint32) Harvest {
 	//cmdline = "sh -c " + cmdline
 	cmdSplit := strings.Split(strings.TrimSpace(cmdline), " ")
 
@@ -86,5 +86,4 @@ func Reaper(cmdline string, timeout int) Harvest {
 
 		return h
 	}
-
 }

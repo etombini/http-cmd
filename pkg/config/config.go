@@ -68,7 +68,7 @@ type Exec struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 	Command     string `yaml:"command"`
-	Timeout     int    `yaml:"timeout"`
+	Timeout     uint32 `yaml:"timeout"`
 }
 
 func checkServerDefault(c *Config) error {
@@ -200,6 +200,15 @@ func loadExecs(c *Config) error {
 				return errors.New("Exec duplicate found (" + name + ") in category " + c.Categories[i].Name + " (" + c.Categories[i].ExecsFilePath + ")")
 			}
 			m[name] = true
+		}
+
+		// set default timeout if not set
+		for j := range eConfig.Execs {
+			if eConfig.Execs[j].Timeout <= 0 {
+				fmt.Fprintf(os.Stderr, "Exec %s in Category %s timeout not set (%d), defaulting to %d\n",
+					eConfig.Execs[j].Name, c.Categories[i].Name, eConfig.Execs[j].Timeout, c.Server.Timeout)
+				eConfig.Execs[j].Timeout = c.Server.Timeout
+			}
 		}
 		c.Categories[i].Execs = eConfig.Execs
 	}

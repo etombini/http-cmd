@@ -37,20 +37,21 @@ func Reaper(cmdline string, timeout int) Harvest {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Start(); err != nil {
-		fmt.Println("Some error happened")
-	}
-
 	var h Harvest
 	h.Command = cmdline
-	if cmd.Process == nil {
-		fmt.Fprintf(os.Stderr, "Process is nil, there is a problem\n")
+
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintf(os.Stderr, "Can not execute command %s:  %v\n", h.Command, err)
 		h.Pid = -1
 		h.ReturnCode = 666
-	} else {
-		h.Pid = cmd.Process.Pid
-		h.ReturnCode = 0
+		h.TimeoutReached = false
+		h.Stderr = err.Error()
+
+		return h
 	}
+
+	h.Pid = cmd.Process.Pid
+	h.ReturnCode = 0
 	h.TimeoutReached = false
 
 	done := make(chan error, 1)
@@ -68,24 +69,22 @@ func Reaper(cmdline string, timeout int) Harvest {
 		h.Stderr = stderr.String()
 		h.Stdout = stdout.String()
 
+		return h
+
 	case err := <-done:
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Command \"%s\" returned an error = %s\n", h.Command, err.Error())
+			fmt.Fprintf(os.Stderr, "Command \"%s\" returned an error: %s\n", h.Command, err.Error())
 			if strings.HasPrefix(err.Error(), "exit status") {
 				h.ReturnCode, _ = strconv.Atoi(err.Error()[12:])
 			} else {
 				h.ReturnCode = 666
 			}
-			h.Stderr = err.Error()
-			if stderr.String() != "" {
-				h.Stderr = h.Stderr + "\n" + stderr.String()
-			}
-		} else {
-			h.ReturnCode = 0
-			h.Stderr = stderr.String()
 		}
+
+		h.Stderr = stderr.String()
 		h.Stdout = stdout.String()
+
+		return h
 	}
 
-	return h
 }

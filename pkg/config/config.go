@@ -8,6 +8,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"errors"
@@ -45,6 +46,7 @@ type Config struct {
 		CatalogPrefix string `yaml:"catalog_prefix"`
 		ExecPrefix    string `yaml:"exec_prefix"`
 		User          string `yaml:"user"`
+		UID           uint32
 	}
 
 	FilePath   string
@@ -121,14 +123,6 @@ func checkServerDefault(c *Config) error {
 	if c.Server.User == "" {
 		fmt.Fprintf(os.Stderr, "User is not set, defaulting to %s\n", DefaultUser)
 		c.Server.User = DefaultUser
-	}
-
-	user, err := user.Current()
-	if err != nil {
-		return errors.New("Can not get uid of the process owner")
-	}
-	if user.Username != c.Server.User {
-		return errors.New("User defined in configuration (" + c.Server.User + ") is not running the application (" + user.Username + ")")
 	}
 
 	return nil
@@ -234,6 +228,22 @@ func checkExecNames(c *Config) error {
 	return nil
 }
 
+func setuid(c *Config) error {
+	u, err := user.Lookup(c.Server.User)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unknow user %s\n", c.Server.User)
+		return errors.New("Unknown user " + c.Server.User)
+	}
+
+	uid, err := strconv.ParseUint(u.Uid, 10, 32)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error while parsing uid %s\n", u.Uid)
+		return errors.New("Error while parsing uid " + u.Uid)
+	}
+	c.Server.UID = uint32(uid)
+	return nil
+}
+
 // New return a new Config structure, loaded according to a configuration file
 func New(filename string) (*Config, error) {
 	config, err := ioutil.ReadFile(filename)
@@ -268,6 +278,10 @@ func New(filename string) (*Config, error) {
 		return nil, err
 	}
 	if err := checkExecNames(&cfg); err != nil {
+		return nil, err
+	}
+
+	if err := setuid(&cfg); err != nil {
 		return nil, err
 	}
 

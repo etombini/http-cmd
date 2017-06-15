@@ -8,6 +8,10 @@ import (
 	"os"
 	"strconv"
 
+	"net"
+
+	"syscall"
+
 	"github.com/etombini/http-cmd/pkg/config"
 	"github.com/etombini/http-cmd/pkg/hangman"
 )
@@ -164,6 +168,17 @@ func Run(config config.Config) {
 		http.HandleFunc(*eh[i].pattern, *eh[i].handler)
 	}
 
-	err := http.ListenAndServe(config.Server.Address+":"+strconv.Itoa(int(config.Server.Port)), nil)
+	listener, err := net.Listen("tcp", config.Server.Address+":"+strconv.Itoa(int(config.Server.Port)))
+	if err != nil {
+		os.Exit(1)
+	}
+
+	err = syscall.Setuid(int(config.Server.UID))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Can not setuid to %d (%s)\n", config.Server.UID, config.Server.User)
+		os.Exit(1)
+	}
+
+	err = http.Serve(listener, nil)
 	fmt.Printf("DEBUG: Server failed %s\n", err)
 }

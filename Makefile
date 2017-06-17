@@ -14,11 +14,10 @@ all: httpcmd
 
 httpcmd:
 	@echo "Building http-cmd Version: $(VERSION) - Build: $(BUILD)"
-	mkdir -p $(BIN_DIR)
+	@mkdir -p $(BIN_DIR)
 	go build -ldflags "-X github.com/etombini/http-cmd/pkg/version.version=$(VERSION) -X github.com/etombini/http-cmd/pkg/version.build=$(BUILD)"  -o $(HTTPCMD_BIN) $(HTTPCMD_SRC)
 	
 test: $(HTTPCMD_TEST)
-	@echo "Testing"
 	
 	
 $(HTTPCMD_TEST):

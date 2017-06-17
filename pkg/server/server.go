@@ -2,14 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"net/http"
-
+	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"strconv"
-
-	"net"
-
 	"syscall"
 
 	"github.com/etombini/http-cmd/pkg/config"
@@ -39,6 +37,12 @@ func execHandlerGenerator(config config.Config) []execHandler {
 
 			// Generating the Handler func
 			*handler = func(w http.ResponseWriter, r *http.Request) {
+				if os.Getuid() != int(config.Server.UID) {
+					err := errors.New("500 - UID executing this resquest is not allowed (" + strconv.Itoa(os.Getuid()) + ")")
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					fmt.Fprintf(os.Stderr, "UID executing this resquest is not allowed (%d)\n", os.Getuid())
+					return
+				}
 				if r.Method != "GET" {
 					http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
 					return
@@ -97,6 +101,12 @@ func catalogHandlerGenerator(config config.Config) []catalogHandler {
 
 	// Generating the Handler func for the first catalog level
 	cHandler := func(w http.ResponseWriter, r *http.Request) {
+		if os.Getuid() != int(config.Server.UID) {
+			err := errors.New("500 - UID executing this resquest is not allowed (" + strconv.Itoa(os.Getuid()) + ")")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Fprintf(os.Stderr, "UID executing this resquest is not allowed (%d)\n", os.Getuid())
+			return
+		}
 		if r.Method != "GET" {
 			http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -131,6 +141,12 @@ func catalogHandlerGenerator(config config.Config) []catalogHandler {
 
 		// Generating the Handler func for each catalog category
 		ecHandler := func(w http.ResponseWriter, r *http.Request) {
+			if os.Getuid() != int(config.Server.UID) {
+				err := errors.New("500 - UID executing this resquest is not allowed (" + strconv.Itoa(os.Getuid()) + ")")
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				fmt.Fprintf(os.Stderr, "UID executing this resquest is not allowed (%d)\n", os.Getuid())
+				return
+			}
 			if r.Method != "GET" {
 				http.Error(w, "405 method not allowed", http.StatusMethodNotAllowed)
 				return

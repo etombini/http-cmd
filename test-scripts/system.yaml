@@ -7,3 +7,7 @@ execs:
       command: w
       description: Display who is logged in and what they are doing
       timeout: 5
+    - name: echo
+      command: echo "It is working great"
+      description: Testing quotes, because it has to be
+      timeout: 5

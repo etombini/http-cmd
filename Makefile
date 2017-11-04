@@ -20,6 +20,10 @@ httpcmd:
 	@mkdir -p $(BIN_DIR)
 	go build -ldflags "-X github.com/etombini/http-cmd/pkg/version.version=$(VERSION) -X github.com/etombini/http-cmd/pkg/version.build=$(BUILD)"  -o $(HTTPCMD_BIN) $(HTTPCMD_SRC)
 	
+
+run: httpcmd
+	sudo -u http-cmd ./bin/http-cmd -config ./local/http-cmd.yaml
+
 test: $(HTTPCMD_TEST)
 	
 $(HTTPCMD_TEST):

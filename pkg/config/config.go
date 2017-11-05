@@ -5,10 +5,8 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"os/user"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"errors"
@@ -33,8 +31,8 @@ const (
 	DefaultExecPrefix string = "/run/"
 	// LoggerName is the default logger name for this package
 	LoggerName string = "config"
-	//DefaultUser is the default user id which runs http-cmd application
-	DefaultUser string = "http-cmd"
+	// //DefaultUser is the default user id which runs http-cmd application
+	// DefaultUser string = "http-cmd"
 )
 
 // Config is a structure representing the global application configuration
@@ -45,8 +43,8 @@ type Config struct {
 		Timeout       uint32 `yaml:"timeout"`
 		CatalogPrefix string `yaml:"catalog_prefix"`
 		ExecPrefix    string `yaml:"exec_prefix"`
-		User          string `yaml:"user"`
-		UID           uint32
+		//		User          string `yaml:"user"`
+		UID uint32
 	}
 
 	FilePath   string
@@ -120,10 +118,10 @@ func checkServerDefault(c *Config) error {
 			c.Server.CatalogPrefix,
 			c.Server.ExecPrefix)
 	}
-	if c.Server.User == "" {
-		fmt.Fprintf(os.Stderr, "User is not set, defaulting to %s\n", DefaultUser)
-		c.Server.User = DefaultUser
-	}
+	// if c.Server.User == "" {
+	// 	fmt.Fprintf(os.Stderr, "User is not set, defaulting to %s\n", DefaultUser)
+	// 	c.Server.User = DefaultUser
+	// }
 
 	return nil
 }
@@ -228,21 +226,22 @@ func checkExecNames(c *Config) error {
 	return nil
 }
 
-func setuid(c *Config) error {
-	u, err := user.Lookup(c.Server.User)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unknow user %s\n", c.Server.User)
-		return errors.New("Unknown user " + c.Server.User)
-	}
+// func setuid(c *Config) error {
+// 	u, err := user.Lookup(c.Server.User)
+// 	if err != nil {
+// 		fmt.Fprintf(os.Stderr, "Unknow user %s\n", c.Server.User)
+// 		return errors.New("Unknown user " + c.Server.User)
+// 	}
 
-	uid, err := strconv.ParseUint(u.Uid, 10, 32)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error while parsing uid %s\n", u.Uid)
-		return errors.New("Error while parsing uid " + u.Uid)
-	}
-	c.Server.UID = uint32(uid)
-	return nil
-}
+// 	uid, err := strconv.ParseUint(u.Uid, 10, 32)
+// 	if err != nil {
+// 		fmt.Fprintf(os.Stderr, "Error while parsing uid %s\n", u.Uid)
+// 		return errors.New("Error while parsing uid " + u.Uid)
+// 	}
+// 	c.Server.UID = uint32(uid)
+// 	fmt.Printf("Server uid is %d\n", c.Server.UID)
+// 	return nil
+// }
 
 // New return a new Config structure, loaded according to a configuration file
 func New(filename string) (*Config, error) {
@@ -281,9 +280,9 @@ func New(filename string) (*Config, error) {
 		return nil, err
 	}
 
-	if err := setuid(&cfg); err != nil {
-		return nil, err
-	}
+	// if err := setuid(&cfg); err != nil {
+	// 	return nil, err
+	// }
 
 	return &cfg, nil
 }

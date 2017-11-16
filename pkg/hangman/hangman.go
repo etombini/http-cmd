@@ -12,19 +12,20 @@ import (
 
 // Harvest is the result of an execution done by the function Reaper
 type Harvest struct {
-	Command        string
-	ReturnCode     int
-	TimeoutReached bool
-	Pid            int
-	Stdout         string
-	Stderr         string
+	OriginalCommand string `json:"orignal_command"`
+	ExecutedCommand string `json:"executed_command"`
+	ReturnCode      int    `json:"return_code"`
+	TimeoutReached  bool   `json:"timeout_reached"`
+	Pid             int    `json:"pid"`
+	Stdout          string `json:"stdout"`
+	Stderr          string `json:"stderr"`
 }
 
 // Reaper execute a program with is parameters as a string, with a timeout limiting execution time
 func Reaper(cmdline string, timeout uint32) Harvest {
 	//cmdline = "sh -c " + cmdline
-	cmdline = os.ExpandEnv(cmdline)
-	cmdSplit := strings.Split(strings.TrimSpace(cmdline), " ")
+	expandedCmdline := os.ExpandEnv(cmdline)
+	cmdSplit := strings.Split(strings.TrimSpace(expandedCmdline), " ")
 
 	var cmd *exec.Cmd
 	if len(cmdSplit) > 1 {
@@ -39,10 +40,11 @@ func Reaper(cmdline string, timeout uint32) Harvest {
 	cmd.Stderr = &stderr
 
 	var h Harvest
-	h.Command = cmdline
+	h.ExecutedCommand = expandedCmdline
+	h.OriginalCommand = cmdline
 
 	if err := cmd.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "Can not execute command %s:  %v\n", h.Command, err)
+		fmt.Fprintf(os.Stderr, "Can not execute command %s:  %v\n", h.ExecutedCommand, err)
 		h.Pid = -1
 		h.ReturnCode = 666
 		h.TimeoutReached = false
@@ -75,7 +77,7 @@ func Reaper(cmdline string, timeout uint32) Harvest {
 
 	case err := <-done:
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Command \"%s\" returned an error: %s\n", h.Command, err.Error())
+			fmt.Fprintf(os.Stderr, "Command \"%s\" returned an error: %s\n", h.ExecutedCommand, err.Error())
 			if strings.HasPrefix(err.Error(), "exit status") {
 				h.ReturnCode, _ = strconv.Atoi(err.Error()[12:])
 			} else {

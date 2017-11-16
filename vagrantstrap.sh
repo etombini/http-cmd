@@ -12,3 +12,4 @@ rm -rf /tmp/go1.9.2.linux-amd64.tar.gz
 echo 'PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/local/go/bin"' > /etc/environment
 
 adduser --system http-cmd
+

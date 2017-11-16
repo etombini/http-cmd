@@ -56,8 +56,10 @@ func Reaper(cmdline string, timeout uint32) Harvest {
 	h.TimeoutReached = false
 
 	done := make(chan error, 1)
+
 	go func() {
 		done <- cmd.Wait()
+		close(done)
 	}()
 
 	select {
@@ -69,7 +71,6 @@ func Reaper(cmdline string, timeout uint32) Harvest {
 		h.TimeoutReached = true
 		h.Stderr = stderr.String()
 		h.Stdout = stdout.String()
-
 		return h
 
 	case err := <-done:
@@ -84,7 +85,6 @@ func Reaper(cmdline string, timeout uint32) Harvest {
 
 		h.Stderr = stderr.String()
 		h.Stdout = stdout.String()
-
 		return h
 	}
 }

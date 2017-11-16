@@ -60,10 +60,10 @@ func execHandlerGenerator(config config.Config) []execHandler {
 }
 
 type exec4JSON struct {
-	Name        string
-	Description string
-	Command     string
-	Timeout     uint32
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Command     string `json:"command"`
+	Timeout     uint32 `json:"timeout"`
 }
 
 type execCatalog4JSON struct {
@@ -73,8 +73,8 @@ type execCatalog4JSON struct {
 }
 
 type catalog4JSON struct {
-	Name        string
-	Description string
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // catalogHandlerGenerator returns a list of struct catalogHandler.
